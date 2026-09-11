@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<title>商品价格查询</title>
+<!-- 如果这个 CDN 打不开，可换 https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js -->
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; background: #0f1115; color: #e8eaed;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+    padding: env(safe-area-inset-top) 12px calc(14px + env(safe-area-inset-bottom));
+    max-width: 520px; margin: 0 auto;
+  }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 14px 4px; }
+  h1 { font-size: 17px; margin: 0; font-weight: 600; }
+  button {
+    border: none; border-radius: 10px; padding: 12px 16px; font-size: 15px;
+    background: #2a2f3a; color: #e8eaed; font-family: inherit; cursor: pointer;
+  }
+  button:active { opacity: .7; }
+  .primary { background: #2f6fff; color: #fff; }
+  .hidden { display: none !important; }
+
+  #reader { width: 100%; border-radius: 14px; overflow: hidden; }
+  #reader video { border-radius: 14px; }
+
+  #startWrap { text-align: center; margin: 20px 0; }
+  #startWrap .tip { color: #8b93a1; font-size: 13px; margin-top: 12px; line-height: 1.7; }
+
+  .panel { background: #171b22; border-radius: 16px; padding: 22px 18px; margin-top: 16px; text-align: center; }
+  .code { font-size: 13px; color: #8b93a1; letter-spacing: 1.5px; word-break: break-all; }
+  .price { font-size: 46px; font-weight: 700; margin: 14px 0 20px; letter-spacing: -1px; }
+  .price.none { font-size: 22px; color: #8b93a1; font-weight: 500; }
+  .actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+  #editRow { display: flex; gap: 10px; margin-bottom: 16px; }
+  #priceInput {
+    flex: 1; min-width: 0; font-size: 24px; padding: 10px 14px; border-radius: 10px;
+    border: 1px solid #333a46; background: #0f1115; color: #fff; text-align: center;
+  }
+  #priceInput:focus { outline: none; border-color: #2f6fff; }
+
+  /* 弹层 */
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.65); display: flex; align-items: flex-end; z-index: 50; }
+  .modal-inner {
+    background: #171b22; width: 100%; max-width: 520px; margin: 0 auto;
+    max-height: 86vh; border-radius: 16px 16px 0 0; padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .modal-head { display: flex; align-items: center; justify-content: space-between; }
+  .modal-head h2 { font-size: 16px; margin: 0; }
+  #search {
+    width: 100%; padding: 11px 14px; border-radius: 10px; border: 1px solid #333a46;
+    background: #0f1115; color: #fff; font-size: 15px;
+  }
+  #search:focus { outline: none; border-color: #2f6fff; }
+  #listBody { overflow: auto; flex: 1; min-height: 120px; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 11px 2px; border-bottom: 1px solid #232833; }
+  .row .k { flex: 1; font-size: 14px; color: #aab2c0; word-break: break-all; }
+  .row .v { font-weight: 600; font-size: 15px; }
+  .row button { padding: 6px 11px; background: #3a2029; color: #ff7a8a; border-radius: 8px; font-size: 14px; }
+  .empty { text-align: center; color: #6b7482; padding: 30px 0; font-size: 14px; }
+  .modal-foot { display: flex; gap: 10px; }
+  .modal-foot button, .filebtn {
+    flex: 1; text-align: center; padding: 12px; border-radius: 10px;
+    background: #2a2f3a; font-size: 15px; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🔍 价格查询</h1>
+  <button id="btnList">价格表</button>
+</header>
+
+<div id="reader"></div>
+
+<div id="startWrap">
+  <button id="btnStart" class="primary" style="padding:16px 44px;font-size:17px;">开始扫码</button>
+  <div style="margin-top:12px;"><button id="btnManual">手动输入条码</button></div>
+  <div class="tip">首次使用请允许摄像头权限<br>建议用系统浏览器打开（Chrome / Safari / 夸克）</div>
+</div>
+
+<div id="panel" class="panel hidden">
+  <div class="code" id="codeText">—</div>
+  <div class="price none" id="priceText">未录入</div>
+  <div id="editRow" class="hidden">
+    <input id="priceInput" type="number" inputmode="decimal" step="0.01" min="0" placeholder="输入价格">
+    <button id="btnSave" class="primary">保存</button>
+  </div>
+  <div class="actions">
+    <button id="btnEdit">改价</button>
+    <button id="btnDelete">删除</button>
+    <button id="btnRescan" class="primary">继续扫码</button>
+  </div>
+</div>
+
+<!-- 价格表弹层 -->
+<div id="listModal" class="modal hidden">
+  <div class="modal-inner">
+    <div class="modal-head">
+      <h2>价格表（<span id="listCount">0</span>）</h2>
+      <button id="btnClose">关闭</button>
+    </div>
+    <input id="search" placeholder="搜索条码…">
+    <div id="listBody"></div>
+    <div class="modal-foot">
+      <button id="btnExport">导出备份</button>
+      <label class="filebtn">导入备份<input type="file" id="fileImport" accept=".json,application/json" hidden></label>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------------- 数据层 ---------------- */
+const STORE_KEY = 'price_db_v1';
+let db = {};
+try { db = JSON.parse(localStorage.getItem(STORE_KEY) || '{}') || {}; } catch (e) { db = {}; }
+const persist = () => localStorage.setItem(STORE_KEY, JSON.stringify(db));
+
+/* ---------------- 元素 ---------------- */
+const $ = id => document.getElementById(id);
+const panel = $('panel'), startWrap = $('startWrap');
+
+/* ---------------- 扫码 ---------------- */
+let scanner = null;
+let currentCode = '';
+let lastCode = '', lastAt = 0;
+
+async function startScan() {
+  panel.classList.add('hidden');
+  startWrap.classList.add('hidden');
+
+  if (!scanner) {
+    scanner = new Html5Qrcode('reader', { verbose: false });
+  }
+  if (scanner.isScanning) return;
+
+  try {
+    await scanner.start(
+      { facingMode: 'environment' },
+      {
+        fps: 10,
+        // 扁长取景框，更适合一维条码
+        qrbox: (vw, vh) => {
+          const w = Math.min(vw * 0.85, 320);
+          return { width: Math.floor(w), height: Math.floor(w * 0.45) };
+        },
+        aspectRatio: 1.7777,
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.ITF,
+          Html5QrcodeSupportedFormats.CODABAR
+        ]
+      },
+      onScanSuccess,
+      () => {}            // 扫描失败的帧，忽略
+    );
+  } catch (err) {
+    startWrap.classList.remove('hidden');
+    alert('摄像头启动失败：' + err + '\n\n请确认：\n1. 用 HTTPS 或 localhost 打开\n2. 已允许摄像头权限');
+  }
+}
+
+async function stopScan() {
+  if (scanner && scanner.isScanning) {
+    try { await scanner.stop(); } catch (e) {}
+  }
+}
+
+async function onScanSuccess(text) {
+  const now = Date.now();
+  if (text === lastCode && now - lastAt < 2500) return;  // 防重复
+  lastCode = text;
+  lastAt = now;
+  currentCode = text;
+
+  if (navigator.vibrate) navigator.vibrate(60);
+  await stopScan();
+  showPanel();
+}
+
+/* ---------------- 结果面板 ---------------- */
+function showPanel() {
+  panel.classList.remove('hidden');
+  $('codeText').textContent = currentCode;
+  $('editRow').classList.add('hidden');
+  $('btnEdit').classList.remove('hidden');
+  $('btnDelete').classList.remove('hidden');
+  renderPrice();
+}
+
+function renderPrice() {
+  const el = $('priceText');
+  const p = db[currentCode];
+  if (p === undefined || p === null) {
+    el.textContent = '未录入价格';
+    el.classList.add('none');
+  } else {
+    el.textContent = '¥ ' + Number(p).toFixed(2);
+    el.classList.remove('none');
+  }
+}
+
+function enterEditMode() {
+  const input = $('priceInput');
+  input.value = (db[currentCode] !== undefined) ? db[currentCode] : '';
+  $('editRow').classList.remove('hidden');
+  $('btnEdit').classList.add('hidden');
+  $('btnDelete').classList.add('hidden');
+  setTimeout(() => { input.focus(); input.select(); }, 50);
+}
+
+/* ---------------- 事件绑定 ---------------- */
+$('btnStart').onclick = startScan;
+
+$('btnRescan').onclick = () => {
+  lastCode = '';            // 允许立刻重扫同一个码
+  startScan();
+};
+
+$('btnManual').onclick = () => {
+  const code = prompt('请输入商品条码：');
+  if (code && code.trim()) {
+    currentCode = code.trim();
+    lastCode = '';
+    showPanel();
+  }
+};
+
+$('btnEdit').onclick = enterEditMode;
+
+$('btnSave').onclick = () => {
+  const v = parseFloat($('priceInput').value);
+  if (isNaN(v) || v < 0) { alert('请输入有效价格'); return; }
+  db[currentCode] = Math.round(v * 100) / 100;
+  persist();
+  $('editRow').classList.add('hidden');
+  $('btnEdit').classList.remove('hidden');
+  $('btnDelete').classList.remove('hidden');
+  renderPrice();
+};
+
+$('priceInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') $('btnSave').click();
+});
+
+$('btnDelete').onclick = () => {
+  if (db[currentCode] === undefined) { alert('这条本来就没录价格'); return; }
+  if (!confirm('确定删除 ' + currentCode + ' 的价格？')) return;
+  delete db[currentCode];
+  persist();
+  renderPrice();
+};
+
+/* ---------------- 价格表 ---------------- */
+$('btnList').onclick = () => {
+  $('listModal').classList.remove('hidden');
+  renderList();
+};
+$('btnClose').onclick = () => $('listModal').classList.add('hidden');
+$('search').oninput = renderList;
+
+function renderList() {
+  const kw = $('search').value.trim();
+  const keys = Object.keys(db).filter(k => !kw || k.includes(kw)).sort();
+  $('listCount').textContent = Object.keys(db).length;
+  $('listBody').innerHTML = keys.length
+    ? keys.map(k => `<div class="row">
+        <span class="k">${k}</span>
+        <span class="v">¥${Number(db[k]).toFixed(2)}</span>
+        <button data-del="${k}">删除</button>
+      </div>`).join('')
+    : '<div class="empty">暂无数据</div>';
+}
+
+$('listBody').addEventListener('click', e => {
+  const code = e.target.dataset && e.target.dataset.del;
+    if (!code) return;
+  if (!confirm('删除 ' + code + ' ？')) return;
+  delete db[code];
+  persist();
+  renderList();
+});
+
+/* ---------------- 导入 / 导出 ---------------- */
+$('btnExport').onclick = () => {
+  const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'price-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+};
+
+$('fileImport').onchange = e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const obj = JSON.parse(reader.result);
+      if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) throw new Error();
+      Object.assign(db, obj);
+      persist();
+      renderList();
+      alert('导入成功，当前共 ' + Object.keys(db).length + ' 条');
+    } catch (err) {
+      alert('文件格式不正确');
+    }
+  };
+  reader.readAsText(f);
+  e.target.value = '';
+};
+
+/* ---------------- 页面切走时停摄像头，省电 ---------------- */
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) stopScan();
+});
+</script>
+</body>
+</html>

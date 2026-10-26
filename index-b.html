@@ -57,14 +57,11 @@
   .stat-line:last-child { border-bottom: none; }
   .empty { text-align: center; color: #999; padding: 20px; }
   .low-stock-badge { display: inline-block; background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; border-radius: 4px; padding: 1px 6px; font-size: 12px; font-weight: 700; margin-left: 4px; }
-  /* 低库存行：淡红背景 + 库存列红色加粗 */
   tr.low-stock td { background: #fff5f5; }
   tr.low-stock td.stock-cell { color: #c62828; font-weight: 700; }
-  /* 低库存查询结果卡片 */
   .result-card.low { background: #fff5f5; border-color: #ffcdd2; }
   .result-card.low .big-price { color: #c62828; }
   .warn-tip { color: #c62828; font-size: 13px; margin-bottom: 10px; font-weight: 600; }
-  .threshold-tag { display: inline-block; background: #fff3e0; color: #e65100; border: 1px solid #ffe0b2; border-radius: 6px; padding: 2px 8px; font-size: 13px; margin-left: 6px; }
   @media (max-width: 700px) {
     body { padding: 10px; }
     .scan-row { flex-direction: column; }
@@ -88,8 +85,8 @@
   <!-- 价格查询 -->
   <section id="tab-query" class="tab active">
     <div class="card">
-      <h2>价格查询 <span class="threshold-tag" id="queryThresholdTag">库存预警值：10</span></h2>
-      <p class="warn-tip">库存低于预警值的商品会红色显示并自动置顶，请优先补货。</p>
+      <h2>价格查询</h2>
+      <p class="warn-tip">每个商品都有自己的库存预警值：库存低于或等于该商品预警值时，红色显示并自动置顶。</p>
       <div class="scan-row">
         <input id="queryInput" placeholder="扫描条码，或输入名称 / 条码后4位，按回车查询" autocomplete="off">
         <button class="btn primary" onclick="doQuery()">查询</button>
@@ -101,7 +98,7 @@
       </div>
       <table>
         <thead>
-          <tr><th>条码</th><th>名称</th><th>售价</th><th>库存</th></tr>
+          <tr><th>条码</th><th>名称</th><th>售价</th><th>库存</th><th>预警值</th></tr>
         </thead>
         <tbody id="queryTableBody"></tbody>
       </table>
@@ -150,17 +147,9 @@
   <section id="tab-products" class="tab">
     <div class="card">
       <h2>商品管理</h2>
-
-      <div class="form-box">
-        <h3>库存预警设置</h3>
-        <div class="form-grid">
-          <label>库存低于此值视为预警<input id="thresholdInput" type="number" min="0" step="1" placeholder="例如 10"></label>
-        </div>
-        <button class="btn primary" onclick="saveThreshold()">保存预警值</button>
-        <span class="muted" style="margin-left:10px;">当前预警值：<strong id="currentThresholdLabel">10</strong></span>
-      </div>
-
-      <p class="muted" style="margin-bottom:10px;">首次打开会带几条示例商品，可直接删除，也可以从 Excel 另存为 CSV 后导入。CSV 列建议：条码,名称,售价,进价,库存。</p>
+      <p class="muted" style="margin-bottom:10px;">
+        每个商品可单独设置“预警值”：库存低于或等于该值时，价格查询里会红色告警并置顶。首次打开会带几条示例商品，可直接删除，也可以从 Excel 另存为 CSV 后导入。CSV 列建议：条码,名称,售价,进价,库存,预警值。
+      </p>
       <div class="toolbar">
         <button class="btn primary" onclick="showProductForm()">＋ 新增商品</button>
         <button class="btn" onclick="document.getElementById('importProductFile').click()">导入商品 CSV/JSON</button>
@@ -179,6 +168,7 @@
           <label>售价<input id="pfPrice" type="number" step="0.01" placeholder="售价"></label>
           <label>进价<input id="pfCost" type="number" step="0.01" placeholder="进价，可不填"></label>
           <label>库存<input id="pfStock" type="number" step="1" placeholder="库存数量"></label>
+          <label>预警值<input id="pfLowStock" type="number" min="0" step="1" placeholder="库存低于/等于此值预警"></label>
         </div>
         <button class="btn primary" onclick="saveProduct()">保存</button>
         <button class="btn" onclick="hideProductForm()">取消</button>
@@ -186,7 +176,7 @@
 
       <table>
         <thead>
-          <tr><th>条码</th><th>名称</th><th>售价</th><th>进价</th><th>库存</th><th>操作</th></tr>
+          <tr><th>条码</th><th>名称</th><th>售价</th><th>进价</th><th>库存</th><th>预警值</th><th>操作</th></tr>
         </thead>
         <tbody id="productTableBody"></tbody>
       </table>
@@ -215,10 +205,9 @@
 </main>
 
 <script>
-/* ==================== 存储键 ==================== */
-const PRODUCTS_KEY = 'mini_pos_products_v1';
+/* ==================== 存储键与常量 ==================== */
+const PRODUCTS_KEY = 'mini_pos_products_v2';
 const TRANSACTIONS_KEY = 'mini_pos_transactions_v1';
-const LOW_STOCK_KEY = 'mini_pos_low_stock_threshold_v1';
 const DEFAULT_LOW_STOCK = 10;
 const PAYMENT_LABELS = { cash: '现金', wechat: '微信', alipay: '支付宝' };
 
@@ -267,50 +256,22 @@ function downloadFile(filename, content, type) {
   setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
 }
 
-/* ==================== 库存预警阈值 ==================== */
-function getLowStockThreshold() {
-  const v = Number(localStorage.getItem(LOW_STOCK_KEY));
+/* ==================== 每个商品的预警值 ==================== */
+function getProductLowStock(p) {
+  const v = Number(p && p.lowStock);
   return isFinite(v) && v >= 0 ? Math.floor(v) : DEFAULT_LOW_STOCK;
 }
-function setLowStockThreshold(v) {
-  localStorage.setItem(LOW_STOCK_KEY, String(Math.max(0, Math.floor(Number(v) || 0))));
-}
-function isLowStock(product) {
-  return Number(product && product.stock || 0) <= getLowStockThreshold();
-}
-function updateThresholdUI() {
-  const t = getLowStockThreshold();
-  const input = document.getElementById('thresholdInput');
-  if (input) input.value = t;
-  const label = document.getElementById('currentThresholdLabel');
-  if (label) label.textContent = t;
-  const tag = document.getElementById('queryThresholdTag');
-  if (tag) tag.textContent = '库存预警值：' + t;
-}
-function saveThreshold() {
-  const input = document.getElementById('thresholdInput');
-  const v = Number(input.value);
-  if (!isFinite(v) || v < 0) {
-    alert('请输入有效的库存预警值（≥ 0 的整数）');
-    return;
-  }
-  setLowStockThreshold(v);
-  updateThresholdUI();
-  renderProducts();
-  renderQueryTable(document.getElementById('queryFilter').value || '');
-  if (document.getElementById('queryInput').value.trim()) {
-    doQuery();
-  }
-  alert('已保存：库存低于或等于 ' + getLowStockThreshold() + ' 的商品会红色预警并置顶');
+function isLowStock(p) {
+  return Number(p && p.stock || 0) <= getProductLowStock(p);
 }
 
 /* ==================== 初始化示例商品 ==================== */
 if (localStorage.getItem(PRODUCTS_KEY) === null) {
   saveProducts([
-    { barcode: '6901234567890', name: '可口可乐 330ml', price: 3.5, cost: 2.8, stock: 100 },
-    { barcode: '6901234567891', name: '农夫山泉 550ml', price: 2.0, cost: 1.2, stock: 200 },
-    { barcode: '6901234567892', name: '康师傅红烧牛肉面', price: 4.5, cost: 3.6, stock: 50 },
-    { barcode: '6901234567893', name: '红牛 250ml', price: 6.0, cost: 5.0, stock: 8 }
+    { barcode: '6901234567890', name: '可口可乐 330ml', price: 3.5, cost: 2.8, stock: 100, lowStock: 20 },
+    { barcode: '6901234567891', name: '农夫山泉 550ml', price: 2.0, cost: 1.2, stock: 200, lowStock: 30 },
+    { barcode: '6901234567892', name: '康师傅红烧牛肉面', price: 4.5, cost: 3.6, stock: 50, lowStock: 10 },
+    { barcode: '6901234567893', name: '红牛 250ml', price: 6.0, cost: 5.0, stock: 8, lowStock: 10 }
   ]);
 }
 
@@ -323,7 +284,6 @@ function switchTab(tab) {
     btn.classList.toggle('active', btn.getAttribute('data-tab') === tab);
   });
   if (tab === 'query') {
-    updateThresholdUI();
     renderQueryTable(document.getElementById('queryFilter').value || '');
     setTimeout(function () { document.getElementById('queryInput').focus(); }, 50);
   }
@@ -333,7 +293,6 @@ function switchTab(tab) {
     setTimeout(function () { document.getElementById('cashierInput').focus(); }, 50);
   }
   if (tab === 'products') {
-    updateThresholdUI();
     renderProducts();
   }
   if (tab === 'daily') {
@@ -342,24 +301,36 @@ function switchTab(tab) {
 }
 
 /* ==================== 价格查询 ==================== */
-function productCardHtml(p, threshold) {
-  const low = Number(p.stock || 0) <= threshold;
+function productCardHtml(p) {
+  const low = isLowStock(p);
+  const lowStock = getProductLowStock(p);
   return '<div class="result-card' + (low ? ' low' : '') + '">' +
     '<div class="big-price">¥' + formatMoney(p.price) +
       (low ? ' <span class="low-stock-badge">库存紧张</span>' : '') +
     '</div>' +
     '<div><strong>' + escapeHtml(p.name) + '</strong></div>' +
-    '<div class="muted">条码：' + escapeHtml(p.barcode) + ' ｜ 库存：' + (p.stock || 0) +
-      (low ? '（低于预警值 ' + threshold + '）' : '') +
+    '<div class="muted">条码：' + escapeHtml(p.barcode) +
+      ' ｜ 库存：' + (p.stock || 0) +
+      ' ｜ 预警值：' + lowStock +
+      (low ? '（已触发预警）' : '') +
     '</div>' +
   '</div>';
+}
+
+function sortLowStockFirst(list) {
+  return list.slice().sort(function (a, b) {
+    const al = isLowStock(a) ? 0 : 1;
+    const bl = isLowStock(b) ? 0 : 1;
+    if (al !== bl) return al - bl;
+    if (al === 0) return Number(a.stock || 0) - Number(b.stock || 0);
+    return 0;
+  });
 }
 
 function doQuery() {
   const input = document.getElementById('queryInput');
   const q = input.value.trim();
   const box = document.getElementById('queryResult');
-  const threshold = getLowStockThreshold();
   if (!q) {
     box.innerHTML = '<p class="muted">请输入条码、条码后4位或商品名称。</p>';
     renderQueryTable('');
@@ -368,7 +339,7 @@ function doQuery() {
   const products = getProducts();
   const exact = products.find(function (p) { return String(p.barcode) === q; });
   if (exact) {
-    box.innerHTML = productCardHtml(exact, threshold);
+    box.innerHTML = productCardHtml(exact);
     renderQueryTable(q);
     input.select();
     return;
@@ -379,15 +350,8 @@ function doQuery() {
   if (!list.length) {
     box.innerHTML = '<div class="msg error" style="display:block;">没有找到匹配商品，请检查条码或名称。</div>';
   } else {
-    // 低库存置顶，内部按库存升序
-    list.sort(function (a, b) {
-      const al = Number(a.stock || 0) <= threshold ? 0 : 1;
-      const bl = Number(b.stock || 0) <= threshold ? 0 : 1;
-      if (al !== bl) return al - bl;
-      if (al === 0) return Number(a.stock || 0) - Number(b.stock || 0);
-      return 0;
-    });
-    box.innerHTML = list.map(function (p) { return productCardHtml(p, threshold); }).join('');
+    list = sortLowStockFirst(list);
+    box.innerHTML = list.map(function (p) { return productCardHtml(p); }).join('');
   }
   renderQueryTable(q);
   input.select();
@@ -396,28 +360,20 @@ function doQuery() {
 function renderQueryTable(filter) {
   const tbody = document.getElementById('queryTableBody');
   if (!tbody) return;
-  const threshold = getLowStockThreshold();
   const q = String(filter || '').trim().toLowerCase();
   let products = getProducts().filter(function (p) {
     if (!q) return true;
     return String(p.barcode).toLowerCase().includes(q) || String(p.name).toLowerCase().includes(q);
   });
-
-  // 低库存置顶，低库存内部按库存升序
-  products.sort(function (a, b) {
-    const al = Number(a.stock || 0) <= threshold ? 0 : 1;
-    const bl = Number(b.stock || 0) <= threshold ? 0 : 1;
-    if (al !== bl) return al - bl;
-    if (al === 0) return Number(a.stock || 0) - Number(b.stock || 0);
-    return 0;
-  });
+  products = sortLowStockFirst(products);
 
   if (!products.length) {
-    tbody.innerHTML = '<tr><td colspan="4" class="empty">暂无商品</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">暂无商品</td></tr>';
     return;
   }
   tbody.innerHTML = products.map(function (p) {
-    const low = Number(p.stock || 0) <= threshold;
+    const low = isLowStock(p);
+    const lowStock = getProductLowStock(p);
     return '<tr' + (low ? ' class="low-stock"' : '') + '>' +
       '<td>' + escapeHtml(p.barcode) + '</td>' +
       '<td>' + escapeHtml(p.name) + '</td>' +
@@ -425,6 +381,7 @@ function renderQueryTable(filter) {
       '<td class="stock-cell">' + (p.stock || 0) +
         (low ? ' <span class="low-stock-badge">紧张</span>' : '') +
       '</td>' +
+      '<td>' + lowStock + '</td>' +
     '</tr>';
   }).join('');
 }
@@ -694,14 +651,12 @@ function renderProducts() {
   const tbody = document.getElementById('productTableBody');
   if (!tbody) return;
   const products = getProducts();
-  const threshold = getLowStockThreshold();
   if (!products.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty">暂无商品，请新增或导入 CSV</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">暂无商品，请新增或导入 CSV</td></tr>';
     return;
   }
-  // 这里保持原数组顺序，index 与 products 一一对应，编辑/删除不会错位
   tbody.innerHTML = products.map(function (p, index) {
-    const low = Number(p.stock || 0) <= threshold;
+    const low = isLowStock(p);
     return '<tr' + (low ? ' class="low-stock"' : '') + '>' +
       '<td>' + escapeHtml(p.barcode) + '</td>' +
       '<td>' + escapeHtml(p.name) + '</td>' +
@@ -710,6 +665,7 @@ function renderProducts() {
       '<td class="stock-cell">' + (p.stock || 0) +
         (low ? ' <span class="low-stock-badge">紧张</span>' : '') +
       '</td>' +
+      '<td>' + getProductLowStock(p) + '</td>' +
       '<td>' +
         '<button class="btn small" onclick="editProductByIndex(' + index + ')">编辑</button> ' +
         '<button class="btn small danger" onclick="deleteProductByIndex(' + index + ')">删除</button>' +
@@ -726,6 +682,7 @@ function showProductForm() {
   document.getElementById('pfPrice').value = '';
   document.getElementById('pfCost').value = '';
   document.getElementById('pfStock').value = '0';
+  document.getElementById('pfLowStock').value = String(DEFAULT_LOW_STOCK);
   document.getElementById('productForm').style.display = 'block';
   document.getElementById('pfBarcode').focus();
 }
@@ -745,6 +702,7 @@ function editProductByIndex(index) {
   document.getElementById('pfPrice').value = p.price;
   document.getElementById('pfCost').value = p.cost === undefined ? '' : p.cost;
   document.getElementById('pfStock').value = p.stock || 0;
+  document.getElementById('pfLowStock').value = getProductLowStock(p);
   document.getElementById('productForm').style.display = 'block';
   document.getElementById('pfName').focus();
 }
@@ -756,12 +714,24 @@ function saveProduct() {
   const costText = document.getElementById('pfCost').value.trim();
   const cost = costText === '' ? '' : Number(costText);
   const stock = Number(document.getElementById('pfStock').value || 0);
+  const lowStockRaw = document.getElementById('pfLowStock').value.trim();
+  const lowStock = lowStockRaw === '' ? DEFAULT_LOW_STOCK : Number(lowStockRaw);
 
   if (!barcode) { alert('请填写条码'); return; }
   if (!name) { alert('请填写商品名称'); return; }
   if (!isFinite(price) || price < 0) { alert('售价无效'); return; }
   if (cost !== '' && (!isFinite(cost) || cost < 0)) { alert('进价无效'); return; }
   if (!isFinite(stock) || stock < 0) { alert('库存无效'); return; }
+  if (!isFinite(lowStock) || lowStock < 0) { alert('预警值无效，请填 0 或正整数'); return; }
+
+  const productData = {
+    barcode: barcode,
+    name: name,
+    price: price,
+    cost: cost,
+    stock: Math.floor(stock),
+    lowStock: Math.floor(lowStock)
+  };
 
   const products = getProducts();
   if (editingOriginalBarcode === null) {
@@ -769,7 +739,7 @@ function saveProduct() {
       alert('该条码已存在，请直接编辑原商品');
       return;
     }
-    products.push({ barcode: barcode, name: name, price: price, cost: cost, stock: stock });
+    products.push(productData);
   } else {
     const index = products.findIndex(function (p) { return String(p.barcode) === editingOriginalBarcode; });
     if (index === -1) { alert('原商品不存在，请刷新'); return; }
@@ -777,7 +747,7 @@ function saveProduct() {
       return i !== index && String(p.barcode) === barcode;
     });
     if (duplicate) { alert('新条码与其他商品重复'); return; }
-    products[index] = { barcode: barcode, name: name, price: price, cost: cost, stock: stock };
+    products[index] = productData;
   }
   saveProducts(products);
   hideProductForm();
@@ -803,9 +773,16 @@ function csvEscape(value) {
 
 function exportProductsCSV() {
   const products = getProducts();
-  const lines = ['条码,名称,售价,进价,库存'];
+  const lines = ['条码,名称,售价,进价,库存,预警值'];
   products.forEach(function (p) {
-    lines.push([p.barcode, p.name, p.price, p.cost === undefined ? '' : p.cost, p.stock || 0].map(csvEscape).join(','));
+    lines.push([
+      p.barcode,
+      p.name,
+      p.price,
+      p.cost === undefined ? '' : p.cost,
+      p.stock || 0,
+      getProductLowStock(p)
+    ].map(csvEscape).join(','));
   });
   downloadFile('商品列表_' + todayKey() + '.csv', '\uFEFF' + lines.join('\r\n'), 'text/csv;charset=utf-8');
 }
@@ -813,7 +790,6 @@ function exportProductsCSV() {
 function exportAllJSON() {
   const data = {
     exportedAt: new Date().toISOString(),
-    lowStockThreshold: getLowStockThreshold(),
     products: getProducts(),
     transactions: getTransactions()
   };
@@ -859,9 +835,9 @@ function parseCSV(text) {
   if (!lines.length) return [];
   const first = parseCSVLine(lines[0]).map(function (h) { return h.trim(); });
   const hasHeader = first.some(function (h) {
-    return /条码|名称|售价|价格|进价|库存|barcode|name|price|stock/i.test(h);
+    return /条码|名称|售价|价格|进价|库存|预警|barcode|name|price|stock|low/i.test(h);
   });
-  const headers = hasHeader ? first : ['条码', '名称', '售价', '进价', '库存'];
+  const headers = hasHeader ? first : ['条码', '名称', '售价', '进价', '库存', '预警值'];
   const start = hasHeader ? 1 : 0;
   return lines.slice(start).map(function (line) {
     const cols = parseCSVLine(line);
@@ -884,16 +860,21 @@ function normalizeProductRow(row) {
   const priceRaw = String(pickField(row, ['售价', '价格', 'price', 'Price'])).replace(/[¥￥,\s]/g, '');
   const costRaw = String(pickField(row, ['进价', 'cost', 'Cost'])).replace(/[¥￥,\s]/g, '');
   const stockRaw = String(pickField(row, ['库存', 'stock', 'Stock'])).replace(/[,\s]/g, '');
+  const lowRaw = String(pickField(row, ['预警值', '预警', 'lowStock', 'low_stock', 'LowStock'])).replace(/[,\s]/g, '');
+
   const price = Number(priceRaw);
   const cost = costRaw === '' ? '' : Number(costRaw);
   const stock = stockRaw === '' ? 0 : Number(stockRaw);
+  const lowStock = lowRaw === '' ? DEFAULT_LOW_STOCK : Number(lowRaw);
+
   if (!barcode || !name || !isFinite(price)) return null;
   return {
     barcode: barcode,
     name: name,
     price: price,
     cost: isFinite(cost) ? cost : '',
-    stock: isFinite(stock) ? stock : 0
+    stock: isFinite(stock) ? Math.floor(stock) : 0,
+    lowStock: isFinite(lowStock) && lowStock >= 0 ? Math.floor(lowStock) : DEFAULT_LOW_STOCK
   };
 }
 
@@ -934,7 +915,7 @@ function importProductFileHandler(event) {
       }
       const valid = rows.filter(Boolean);
       if (!valid.length) {
-        alert('没有读到有效商品。CSV 请确保有：条码,名称,售价,进价,库存');
+        alert('没有读到有效商品。CSV 请确保有：条码,名称,售价,进价,库存,预警值');
         return;
       }
       const result = mergeProducts(valid);
@@ -960,12 +941,21 @@ function importAllFileHandler(event) {
         return;
       }
       if (!confirm('确定用备份覆盖当前全部商品和交易吗？')) return;
-      saveProducts(data.products);
+      const normalized = data.products.map(function (p) {
+        return {
+          barcode: String(p.barcode || '').trim(),
+          name: String(p.name || '').trim(),
+          price: Number(p.price || 0),
+          cost: p.cost === undefined || p.cost === '' ? '' : Number(p.cost),
+          stock: Number(p.stock || 0),
+          lowStock: isFinite(Number(p.lowStock)) && Number(p.lowStock) >= 0
+            ? Math.floor(Number(p.lowStock))
+            : DEFAULT_LOW_STOCK
+        };
+      }).filter(function (p) { return p.barcode && p.name; });
+
+      saveProducts(normalized);
       saveTransactions(Array.isArray(data.transactions) ? data.transactions : []);
-      if (data.lowStockThreshold !== undefined && isFinite(Number(data.lowStockThreshold))) {
-        setLowStockThreshold(data.lowStockThreshold);
-      }
-      updateThresholdUI();
       cart = [];
       renderProducts();
       renderQueryTable(document.getElementById('queryFilter').value || '');
@@ -1027,7 +1017,6 @@ function init() {
     }
   });
 
-  // 收银台点击空白处，自动把焦点放回扫码框，方便 USB 扫码枪连续扫码
   document.addEventListener('click', function (e) {
     const cashierTab = document.getElementById('tab-cashier');
     if (!cashierTab.classList.contains('active')) return;
@@ -1035,7 +1024,6 @@ function init() {
     cashierInput.focus();
   });
 
-  updateThresholdUI();
   renderQueryTable('');
   renderCart();
   renderCashierSummary();

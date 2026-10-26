@@ -1,410 +1,957 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>便利店收银系统</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; padding: 20px; }
-        .container { max-width: 1200px; margin: 0 auto; display: flex; gap: 20px; flex-wrap: wrap; }
-        .panel { background: white; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); padding: 20px; flex: 1; min-width: 300px; }
-        h2 { margin-bottom: 15px; color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 10px; }
-        .scan-area { display: flex; gap: 10px; margin-bottom: 20px; }
-        #barcodeInput { flex: 1; padding: 15px; font-size: 20px; border: 2px solid #4CAF50; border-radius: 8px; text-align: center; }
-        #barcodeInput:focus { outline: none; border-color: #45a049; box-shadow: 0 0 8px rgba(76,175,80,0.3); }
-        .btn { padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; transition: 0.2s; }
-        .btn-primary { background: #4CAF50; color: white; }
-        .btn-primary:hover { background: #45a049; }
-        .btn-danger { background: #f44336; color: white; }
-        .btn-danger:hover { background: #d32f2f; }
-        .btn-warning { background: #ff9800; color: white; }
-        .btn-warning:hover { background: #e68900; }
-        .cart-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-        .cart-table th, .cart-table td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
-        .cart-table th { background: #f8f9fa; }
-        .cart-table tr:hover { background: #f5f5f5; }
-        .total-section { text-align: right; font-size: 24px; font-weight: bold; margin: 20px 0; color: #333; }
-        .payment-section { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
-        .payment-section .btn { flex: 1; }
-        .message { padding: 10px; margin-top: 10px; border-radius: 5px; display: none; }
-        .message.success { background: #d4edda; color: #155724; display: block; }
-        .message.error { background: #f8d7da; color: #721c24; display: block; }
-        .stat-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
-        .stat-item:last-child { border-bottom: none; }
-        .stats-title { font-weight: bold; margin-top: 15px; margin-bottom: 10px; color: #555; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小便利店 · 查价与收银</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; background: #f0f2f5; color: #222; padding: 16px; }
+  header { max-width: 1280px; margin: 0 auto 16px; }
+  h1 { font-size: 22px; margin-bottom: 12px; }
+  nav { display: flex; gap: 8px; flex-wrap: wrap; }
+  nav button { padding: 10px 16px; border: 1px solid #d0d7de; background: #fff; border-radius: 8px; cursor: pointer; font-size: 15px; }
+  nav button.active { background: #4CAF50; color: #fff; border-color: #4CAF50; }
+  main { max-width: 1280px; margin: 0 auto; }
+  .tab { display: none; }
+  .tab.active { display: block; }
+  .card { background: #fff; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,.08); padding: 18px; margin-bottom: 16px; }
+  h2 { font-size: 18px; margin-bottom: 14px; border-bottom: 2px solid #4CAF50; padding-bottom: 8px; }
+  h3 { font-size: 16px; margin: 16px 0 10px; }
+  .layout { display: flex; gap: 16px; flex-wrap: wrap; }
+  .layout .flex2 { flex: 2; min-width: 340px; }
+  .layout .flex1 { flex: 1; min-width: 280px; }
+  .scan-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .scan-row input { flex: 1; padding: 13px; font-size: 18px; border: 2px solid #4CAF50; border-radius: 8px; }
+  .scan-row input:focus { outline: none; box-shadow: 0 0 8px rgba(76,175,80,.35); }
+  input, button, select { font-family: inherit; }
+  button.btn { padding: 10px 14px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; background: #e9ecef; }
+  button.btn:hover { filter: brightness(.96); }
+  button.btn.primary { background: #4CAF50; color: #fff; }
+  button.btn.danger { background: #f44336; color: #fff; }
+  button.btn.warning { background: #ff9800; color: #fff; }
+  button.btn.small { padding: 5px 9px; font-size: 12px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 9px 8px; border-bottom: 1px solid #e5e7eb; text-align: left; font-size: 14px; }
+  th { background: #f8f9fa; font-weight: 600; }
+  tr:hover td { background: #fafafa; }
+  .total-line { text-align: right; font-size: 24px; font-weight: 700; margin: 14px 0; }
+  .payment-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .payment-row .btn { flex: 1; min-width: 100px; padding: 13px; }
+  .msg { display: none; padding: 10px; border-radius: 6px; margin-bottom: 10px; font-size: 14px; }
+  .msg.success { display: block; background: #d4edda; color: #155724; }
+  .msg.error { display: block; background: #f8d7da; color: #721c24; }
+  .muted { color: #888; font-size: 13px; }
+  .result-card { background: #f1f8e9; border: 1px solid #c5e1a5; border-radius: 10px; padding: 16px; margin-bottom: 12px; }
+  .big-price { font-size: 30px; font-weight: 700; color: #2e7d32; margin-bottom: 4px; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .form-box { background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 10px; }
+  .form-grid label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: #555; }
+  .form-grid input { padding: 9px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 12px; }
+  .summary-item { background: #f8f9fa; border-radius: 8px; padding: 12px; }
+  .summary-item span { display: block; color: #666; font-size: 13px; margin-bottom: 4px; }
+  .summary-item strong { font-size: 20px; }
+  .stat-line { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #eee; font-size: 14px; }
+  .stat-line:last-child { border-bottom: none; }
+  .empty { text-align: center; color: #999; padding: 20px; }
+  @media (max-width: 700px) {
+    body { padding: 10px; }
+    .scan-row { flex-direction: column; }
+    .scan-row input { font-size: 16px; }
+    th, td { font-size: 13px; padding: 7px 5px; }
+  }
+</style>
 </head>
 <body>
-    <div class="container">
-        <!-- 左侧：收银主界面 -->
-        <div class="panel" style="flex: 2;">
-            <h2>🛒 收银台</h2>
-            <div class="scan-area">
-                <input type="text" id="barcodeInput" placeholder="请扫描或输入条码，然后按回车..." autofocus>
-                <button class="btn btn-primary" onclick="addToCart()">添加</button>
-            </div>
-            <div id="message" class="message"></div>
-            <table class="cart-table">
-                <thead>
-                    <tr>
-                        <th>商品</th>
-                        <th>单价</th>
-                        <th>数量</th>
-                        <th>小计</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody id="cartBody">
-                    <!-- 购物车内容 -->
-                </tbody>
-            </table>
-            <div class="total-section">
-                合计: ¥<span id="totalAmount">0.00</span>
-            </div>
-            <div class="payment-section">
-                <button class="btn btn-primary" onclick="checkout('cash')">💰 现金支付</button>
-                <button class="btn btn-primary" onclick="checkout('wechat')">📱 微信支付</button>
-                <button class="btn btn-primary" onclick="checkout('alipay')">📱 支付宝支付</button>
-                <button class="btn btn-warning" onclick="clearCart()">🗑️ 清空</button>
-            </div>
-        </div>
+<header>
+  <h1>🏪 小便利店 · 查价与收银</h1>
+  <nav>
+    <button data-tab="query" class="active">价格查询</button>
+    <button data-tab="cashier">收银台</button>
+    <button data-tab="products">商品管理</button>
+    <button data-tab="daily">日结汇总</button>
+  </nav>
+</header>
 
-        <!-- 右侧：日结汇总 -->
-        <div class="panel" style="flex: 1;">
-            <h2>📊 今日汇总</h2>
-            <div class="stat-item">
-                <span>交易笔数:</span>
-                <strong id="totalTransactions">0</strong>
-            </div>
-            <div class="stat-item">
-                <span>总营业额:</span>
-                <strong>¥<span id="totalRevenue">0.00</span></strong>
-            </div>
-            <div class="stats-title">各支付方式</div>
-            <div class="stat-item">
-                <span>现金:</span>
-                <strong>¥<span id="cashRevenue">0.00</span></strong>
-            </div>
-            <div class="stat-item">
-                <span>微信:</span>
-                <strong>¥<span id="wechatRevenue">0.00</span></strong>
-            </div>
-            <div class="stat-item">
-                <span>支付宝:</span>
-                <strong>¥<span id="alipayRevenue">0.00</span></strong>
-            </div>
-            <hr style="margin: 15px 0;">
-            <button class="btn btn-warning" style="width: 100%; margin-bottom: 10px;" onclick="exportData()">📤 导出当日数据</button>
-            <button class="btn btn-danger" style="width: 100%;" onclick="resetDailyStats()">🔄 重置日结数据</button>
-            <p style="font-size: 12px; color: #999; margin-top: 15px;">
-                数据保存在浏览器本地，请定期点击“导出当日数据”进行备份。
-            </p>
-        </div>
+<main>
+  <!-- 价格查询 -->
+  <section id="tab-query" class="tab active">
+    <div class="card">
+      <h2>价格查询</h2>
+      <div class="scan-row">
+        <input id="queryInput" placeholder="扫描条码，或输入名称 / 条码后4位，按回车查询" autocomplete="off">
+        <button class="btn primary" onclick="doQuery()">查询</button>
+      </div>
+      <div id="queryResult"></div>
+      <h3>全部商品</h3>
+      <div class="scan-row" style="margin-bottom:10px;">
+        <input id="queryFilter" placeholder="输入名称或条码过滤..." style="border:1px solid #ccc; font-size:14px; padding:9px;">
+      </div>
+      <table>
+        <thead>
+          <tr><th>条码</th><th>名称</th><th>售价</th><th>库存</th></tr>
+        </thead>
+        <tbody id="queryTableBody"></tbody>
+      </table>
     </div>
+  </section>
 
-    <script>
-        // ==================== 数据存储 ====================
-        const STORAGE_KEY_PRODUCTS = 'pos_products';
-        const STORAGE_KEY_DAILY_STATS = 'pos_daily_stats';
-        const STORAGE_KEY_TRANSACTIONS = 'pos_transactions';
+  <!-- 收银台 -->
+  <section id="tab-cashier" class="tab">
+    <div class="layout">
+      <div class="card flex2">
+        <h2>收银台</h2>
+        <div class="scan-row">
+          <input id="cashierInput" placeholder="扫描条码，按回车加入购物车" autocomplete="off">
+          <button class="btn primary" onclick="addToCartByInput()">添加</button>
+          <button class="btn" onclick="addTempItem()">临时商品</button>
+        </div>
+        <div id="cashierMsg" class="msg"></div>
+        <table>
+          <thead>
+            <tr><th>商品</th><th>单价</th><th>数量</th><th>小计</th><th>操作</th></tr>
+          </thead>
+          <tbody id="cartBody"></tbody>
+        </table>
+        <div class="total-line">合计：¥<span id="cartTotal">0.00</span></div>
+        <div class="payment-row">
+          <button class="btn primary" onclick="checkout('cash')">💰 现金支付</button>
+          <button class="btn primary" onclick="checkout('wechat')">📱 微信支付</button>
+          <button class="btn primary" onclick="checkout('alipay')">📱 支付宝支付</button>
+          <button class="btn warning" onclick="clearCart()">🗑️ 清空</button>
+        </div>
+      </div>
+      <div class="card flex1">
+        <h2>今日汇总</h2>
+        <div class="stat-line"><span>交易笔数</span><strong id="cashierTxCount">0</strong></div>
+        <div class="stat-line"><span>总营业额</span><strong>¥<span id="cashierRevenue">0.00</span></strong></div>
+        <h3>各支付方式</h3>
+        <div class="stat-line"><span>现金</span><strong>¥<span id="cashierCash">0.00</span></strong></div>
+        <div class="stat-line"><span>微信</span><strong>¥<span id="cashierWechat">0.00</span></strong></div>
+        <div class="stat-line"><span>支付宝</span><strong>¥<span id="cashierAlipay">0.00</span></strong></div>
+        <p class="muted" style="margin-top:14px;">数据保存在浏览器本地。请定期到“商品管理”里点击“导出全部备份JSON”。</p>
+      </div>
+    </div>
+  </section>
 
-        // 初始化示例商品数据（你可以替换为你自己的商品库）
-        function initProducts() {
-            let products = JSON.parse(localStorage.getItem(STORAGE_KEY_PRODUCTS));
-            if (!products || products.length === 0) {
-                products = [
-                    { barcode: '6901234567890', name: '可口可乐 330ml', price: 3.50, stock: 100 },
-                    { barcode: '6901234567891', name: '农夫山泉 550ml', price: 2.00, stock: 200 },
-                    { barcode: '6901234567892', name: '康师傅红烧牛肉面', price: 4.50, stock: 50 },
-                    { barcode: '6901234567893', name: '红牛 250ml', price: 6.00, stock: 80 },
-                ];
-                localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(products));
-            }
-            return products;
-        }
+  <!-- 商品管理 -->
+  <section id="tab-products" class="tab">
+    <div class="card">
+      <h2>商品管理</h2>
+      <p class="muted" style="margin-bottom:10px;">首次打开会带几条示例商品，可直接删除，也可以从 Excel 另存为 CSV 后导入。CSV 列建议：条码,名称,售价,进价,库存。</p>
+      <div class="toolbar">
+        <button class="btn primary" onclick="showProductForm()">＋ 新增商品</button>
+        <button class="btn" onclick="document.getElementById('importProductFile').click()">导入商品 CSV/JSON</button>
+        <input type="file" id="importProductFile" accept=".csv,.json" style="display:none" onchange="importProductFileHandler(event)">
+        <button class="btn" onclick="exportProductsCSV()">导出商品 CSV</button>
+        <button class="btn warning" onclick="exportAllJSON()">导出全部备份 JSON</button>
+        <button class="btn danger" onclick="document.getElementById('importAllFile').click()">导入全部备份</button>
+        <input type="file" id="importAllFile" accept=".json" style="display:none" onchange="importAllFileHandler(event)">
+      </div>
 
-        // 获取今日日期字符串
-        function getTodayKey() {
-            return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-        }
+      <div id="productForm" class="form-box" style="display:none;">
+        <h3 id="productFormTitle">新增商品</h3>
+        <div class="form-grid">
+          <label>条码<input id="pfBarcode" placeholder="完整条码，可扫入"></label>
+          <label>名称<input id="pfName" placeholder="商品名称"></label>
+          <label>售价<input id="pfPrice" type="number" step="0.01" placeholder="售价"></label>
+          <label>进价<input id="pfCost" type="number" step="0.01" placeholder="进价，可不填"></label>
+          <label>库存<input id="pfStock" type="number" step="1" placeholder="库存数量"></label>
+        </div>
+        <button class="btn primary" onclick="saveProduct()">保存</button>
+        <button class="btn" onclick="hideProductForm()">取消</button>
+      </div>
 
-        // 初始化日结数据
-        function initDailyStats() {
-            let stats = JSON.parse(localStorage.getItem(STORAGE_KEY_DAILY_STATS));
-            const today = getTodayKey();
-            if (!stats || stats.date !== today) {
-                stats = {
-                    date: today,
-                    transactions: 0,
-                    totalRevenue: 0,
-                    cashRevenue: 0,
-                    wechatRevenue: 0,
-                    alipayRevenue: 0
-                };
-                localStorage.setItem(STORAGE_KEY_DAILY_STATS, JSON.stringify(stats));
-            }
-            return stats;
-        }
+      <table>
+        <thead>
+          <tr><th>条码</th><th>名称</th><th>售价</th><th>进价</th><th>库存</th><th>操作</th></tr>
+        </thead>
+        <tbody id="productTableBody"></tbody>
+      </table>
+    </div>
+  </section>
 
-        // 保存日结数据
-        function saveDailyStats(stats) {
-            localStorage.setItem(STORAGE_KEY_DAILY_STATS, JSON.stringify(stats));
-        }
+  <!-- 日结汇总 -->
+  <section id="tab-daily" class="tab">
+    <div class="card">
+      <h2>日结汇总</h2>
+      <div id="dailySummary"></div>
+      <div class="toolbar" style="margin-top:14px;">
+        <button class="btn primary" onclick="exportDailyJSON()">导出今日交易 JSON</button>
+        <button class="btn danger" onclick="clearTodayTransactions()">清空今日交易（危险）</button>
+      </div>
+      <p class="muted">清空今日交易不会恢复库存，只删除今日交易记录。建议先导出备份。</p>
+      <h3>今日交易明细</h3>
+      <table>
+        <thead>
+          <tr><th>时间</th><th>商品</th><th>金额</th><th>支付方式</th></tr>
+        </thead>
+        <tbody id="dailyTableBody"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
 
-        // 保存交易记录
-        function saveTransaction(transaction) {
-            let transactions = JSON.parse(localStorage.getItem(STORAGE_KEY_TRANSACTIONS)) || [];
-            transactions.push(transaction);
-            // 只保留最近7天的交易记录，防止localStorage溢出
-            const sevenDaysAgo = new Date();
-            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-            transactions = transactions.filter(t => new Date(t.timestamp) >= sevenDaysAgo);
-            localStorage.setItem(STORAGE_KEY_TRANSACTIONS, JSON.stringify(transactions));
-        }
+<script>
+/* ==================== 存储键 ==================== */
+const PRODUCTS_KEY = 'mini_pos_products_v1';
+const TRANSACTIONS_KEY = 'mini_pos_transactions_v1';
+const PAYMENT_LABELS = { cash: '现金', wechat: '微信', alipay: '支付宝' };
 
-        // ==================== 购物车状态 ====================
-        let cart = [];
+/* ==================== 基础工具 ==================== */
+function getProducts() {
+  try { return JSON.parse(localStorage.getItem(PRODUCTS_KEY)) || []; }
+  catch (e) { return []; }
+}
+function saveProducts(products) {
+  localStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
+}
+function getTransactions() {
+  try { return JSON.parse(localStorage.getItem(TRANSACTIONS_KEY)) || []; }
+  catch (e) { return []; }
+}
+function saveTransactions(transactions) {
+  const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
+  const kept = transactions.filter(t => new Date(t.timestamp).getTime() >= cutoff);
+  localStorage.setItem(TRANSACTIONS_KEY, JSON.stringify(kept));
+}
+function formatMoney(n) {
+  return Number(n || 0).toFixed(2);
+}
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function dateKey(d) {
+  const date = d ? new Date(d) : new Date();
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + day;
+}
+function todayKey() { return dateKey(new Date()); }
+function downloadFile(filename, content, type) {
+  const blob = new Blob([content], { type: type || 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+}
 
-        // ==================== DOM 元素 ====================
-        const barcodeInput = document.getElementById('barcodeInput');
-        const cartBody = document.getElementById('cartBody');
-        const totalAmountEl = document.getElementById('totalAmount');
-        const messageEl = document.getElementById('message');
+/* ==================== 初始化示例商品 ==================== */
+if (localStorage.getItem(PRODUCTS_KEY) === null) {
+  saveProducts([
+    { barcode: '6901234567890', name: '可口可乐 330ml', price: 3.5, cost: 2.8, stock: 100 },
+    { barcode: '6901234567891', name: '农夫山泉 550ml', price: 2.0, cost: 1.2, stock: 200 },
+    { barcode: '6901234567892', name: '康师傅红烧牛肉面', price: 4.5, cost: 3.6, stock: 50 },
+    { barcode: '6901234567893', name: '红牛 250ml', price: 6.0, cost: 5.0, stock: 80 }
+  ]);
+}
 
-        // ==================== 页面初始化 ====================
-        window.onload = function() {
-            initProducts();
-            initDailyStats();
-            updateDailyStatsUI();
-            barcodeInput.focus();
+/* ==================== 标签切换 ==================== */
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(function (el) {
+    el.classList.toggle('active', el.id === 'tab-' + tab);
+  });
+  document.querySelectorAll('nav button').forEach(function (btn) {
+    btn.classList.toggle('active', btn.getAttribute('data-tab') === tab);
+  });
+  if (tab === 'query') {
+    renderQueryTable(document.getElementById('queryFilter').value || '');
+    setTimeout(function () { document.getElementById('queryInput').focus(); }, 50);
+  }
+  if (tab === 'cashier') {
+    renderCart();
+    renderCashierSummary();
+    setTimeout(function () { document.getElementById('cashierInput').focus(); }, 50);
+  }
+  if (tab === 'products') {
+    renderProducts();
+  }
+  if (tab === 'daily') {
+    renderDaily();
+  }
+}
 
-            // 监听扫码枪输入（扫码枪一般会以回车结尾）
-            barcodeInput.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addToCart();
-                }
-            });
+/* ==================== 价格查询 ==================== */
+function doQuery() {
+  const input = document.getElementById('queryInput');
+  const q = input.value.trim();
+  const box = document.getElementById('queryResult');
+  if (!q) {
+    box.innerHTML = '<p class="muted">请输入条码、条码后4位或商品名称。</p>';
+    renderQueryTable('');
+    return;
+  }
+  const products = getProducts();
+  const exact = products.find(function (p) { return String(p.barcode) === q; });
+  if (exact) {
+    box.innerHTML =
+      '<div class="result-card">' +
+        '<div class="big-price">¥' + formatMoney(exact.price) + '</div>' +
+        '<div><strong>' + escapeHtml(exact.name) + '</strong></div>' +
+        '<div class="muted">条码：' + escapeHtml(exact.barcode) + ' ｜ 库存：' + (exact.stock || 0) + '</div>' +
+      '</div>';
+    renderQueryTable(q);
+    input.select();
+    return;
+  }
+  const list = products.filter(function (p) {
+    return String(p.barcode).includes(q) || String(p.name).toLowerCase().includes(q.toLowerCase());
+  });
+  if (!list.length) {
+    box.innerHTML = '<div class="msg error" style="display:block;">没有找到匹配商品，请检查条码或名称。</div>';
+  } else {
+    box.innerHTML = list.map(function (p) {
+      return '<div class="result-card">' +
+        '<div class="big-price">¥' + formatMoney(p.price) + '</div>' +
+        '<div><strong>' + escapeHtml(p.name) + '</strong></div>' +
+        '<div class="muted">条码：' + escapeHtml(p.barcode) + ' ｜ 库存：' + (p.stock || 0) + '</div>' +
+      '</div>';
+    }).join('');
+  }
+  renderQueryTable(q);
+  input.select();
+}
 
-            // 保持输入框焦点（对于USB扫码枪很重要）
-            document.addEventListener('click', function() {
-                barcodeInput.focus();
-            });
-        };
+function renderQueryTable(filter) {
+  const tbody = document.getElementById('queryTableBody');
+  if (!tbody) return;
+  const q = String(filter || '').trim().toLowerCase();
+  const products = getProducts().filter(function (p) {
+    if (!q) return true;
+    return String(p.barcode).toLowerCase().includes(q) || String(p.name).toLowerCase().includes(q);
+  });
+  if (!products.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty">暂无商品</td></tr>';
+    return;
+  }
+  tbody.innerHTML = products.map(function (p) {
+    return '<tr>' +
+      '<td>' + escapeHtml(p.barcode) + '</td>' +
+      '<td>' + escapeHtml(p.name) + '</td>' +
+      '<td>¥' + formatMoney(p.price) + '</td>' +
+      '<td>' + (p.stock || 0) + '</td>' +
+    '</tr>';
+  }).join('');
+}
 
-        // ==================== 核心功能 ====================
+/* ==================== 收银台 ==================== */
+let cart = [];
 
-        // 添加商品到购物车
-        function addToCart() {
-            const barcode = barcodeInput.value.trim();
-            if (!barcode) {
-                showMessage('请输入或扫描条码', 'error');
-                return;
-            }
+function showCashierMsg(text, type) {
+  const el = document.getElementById('cashierMsg');
+  el.textContent = text;
+  el.className = 'msg ' + type;
+  setTimeout(function () {
+    el.className = 'msg';
+    el.textContent = '';
+  }, 3000);
+}
 
-            const products = JSON.parse(localStorage.getItem(STORAGE_KEY_PRODUCTS)) || [];
-            const product = products.find(p => p.barcode === barcode);
+function addToCartByInput() {
+  const input = document.getElementById('cashierInput');
+  const barcode = input.value.trim();
+  if (!barcode) {
+    showCashierMsg('请扫描或输入条码', 'error');
+    return;
+  }
+  const products = getProducts();
+  const product = products.find(function (p) { return String(p.barcode) === barcode; });
+  if (!product) {
+    showCashierMsg('未找到条码 ' + barcode + '，请先到商品管理新增，或点“临时商品”。', 'error');
+    input.value = '';
+    input.focus();
+    return;
+  }
+  const existing = cart.find(function (item) { return !item.isTemp && String(item.barcode) === barcode; });
+  const currentQty = existing ? existing.quantity : 0;
+  if (Number(product.stock || 0) <= currentQty) {
+    showCashierMsg('商品“' + product.name + '”库存不足', 'error');
+    input.value = '';
+    input.focus();
+    return;
+  }
+  if (existing) {
+    existing.quantity += 1;
+  } else {
+    cart.push({
+      barcode: product.barcode,
+      name: product.name,
+      price: Number(product.price || 0),
+      quantity: 1,
+      isTemp: false
+    });
+  }
+  renderCart();
+  input.value = '';
+  input.focus();
+  showCashierMsg('已添加：' + product.name, 'success');
+}
 
-            if (!product) {
-                showMessage(`未找到条码为 ${barcode} 的商品`, 'error');
-                barcodeInput.value = '';
-                barcodeInput.focus();
-                return;
-            }
+function addTempItem() {
+  const name = prompt('临时商品名称（例如：塑料袋、散称零食）：');
+  if (!name) return;
+  const priceText = prompt('单价（元）：');
+  if (priceText === null) return;
+  const price = Number(priceText);
+  if (!isFinite(price) || price < 0) {
+    alert('价格无效');
+    return;
+  }
+  cart.push({
+    barcode: 'TEMP-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+    name: name.trim(),
+    price: price,
+    quantity: 1,
+    isTemp: true
+  });
+  renderCart();
+  document.getElementById('cashierInput').focus();
+}
 
-            // 检查库存
-            const cartItem = cart.find(item => item.barcode === barcode);
-            const currentQtyInCart = cartItem ? cartItem.quantity : 0;
-            if (product.stock <= currentQtyInCart) {
-                showMessage(`商品 "${product.name}" 库存不足`, 'error');
-                barcodeInput.value = '';
-                barcodeInput.focus();
-                return;
-            }
+function renderCart() {
+  const tbody = document.getElementById('cartBody');
+  const totalEl = document.getElementById('cartTotal');
+  if (!tbody) return;
+  if (!cart.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">购物车为空，请扫码添加商品</td></tr>';
+    totalEl.textContent = '0.00';
+    return;
+  }
+  let total = 0;
+  tbody.innerHTML = cart.map(function (item, index) {
+    const subtotal = item.price * item.quantity;
+    total += subtotal;
+    return '<tr>' +
+      '<td>' + escapeHtml(item.name) + (item.isTemp ? ' <span class="muted">(临时)</span>' : '') + '</td>' +
+      '<td>¥' + formatMoney(item.price) + '</td>' +
+      '<td>' +
+        '<button class="btn small" onclick="changeQty(' + index + ',-1)">-</button>' +
+        '<span style="margin:0 8px;">' + item.quantity + '</span>' +
+        '<button class="btn small" onclick="changeQty(' + index + ',1)">+</button>' +
+      '</td>' +
+      '<td>¥' + formatMoney(subtotal) + '</td>' +
+      '<td><button class="btn small danger" onclick="removeCartItem(' + index + ')">删除</button></td>' +
+    '</tr>';
+  }).join('');
+  totalEl.textContent = formatMoney(total);
+}
 
-            // 添加到购物车或增加数量
-            if (cartItem) {
-                cartItem.quantity += 1;
-            } else {
-                cart.push({
-                    barcode: product.barcode,
-                    name: product.name,
-                    price: product.price,
-                    quantity: 1
-                });
-            }
+function changeQty(index, delta) {
+  const item = cart[index];
+  if (!item) return;
+  const newQty = item.quantity + delta;
+  if (newQty <= 0) {
+    cart.splice(index, 1);
+    renderCart();
+    return;
+  }
+  if (!item.isTemp) {
+    const product = getProducts().find(function (p) { return String(p.barcode) === String(item.barcode); });
+    if (product && newQty > Number(product.stock || 0)) {
+      showCashierMsg('商品“' + item.name + '”库存不足', 'error');
+      return;
+    }
+  }
+  item.quantity = newQty;
+  renderCart();
+}
 
-            // 更新界面
-            renderCart();
-            barcodeInput.value = '';
-            barcodeInput.focus();
-            showMessage(`已添加: ${product.name}`, 'success');
-        }
+function removeCartItem(index) {
+  cart.splice(index, 1);
+  renderCart();
+}
 
-        // 渲染购物车
-        function renderCart() {
-            cartBody.innerHTML = '';
-            let total = 0;
+function clearCart() {
+  if (!cart.length) return;
+  if (!confirm('确定清空购物车吗？')) return;
+  cart = [];
+  renderCart();
+  showCashierMsg('购物车已清空', 'success');
+}
 
-            cart.forEach((item, index) => {
-                const subtotal = item.price * item.quantity;
-                total += subtotal;
+function checkout(paymentMethod) {
+  if (!cart.length) {
+    showCashierMsg('购物车是空的', 'error');
+    return;
+  }
+  const products = getProducts();
 
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${item.name}</td>
-                    <td>¥${item.price.toFixed(2)}</td>
-                    <td>
-                        <button onclick="changeQuantity(${index}, -1)" style="padding:2px 8px;">-</button>
-                        <span style="margin:0 8px;">${item.quantity}</span>
-                        <button onclick="changeQuantity(${index}, 1)" style="padding:2px 8px;">+</button>
-                    </td>
-                    <td>¥${subtotal.toFixed(2)}</td>
-                    <td><button class="btn-danger" style="padding:4px 10px; font-size:12px;" onclick="removeFromCart(${index})">删除</button></td>
-                `;
-                cartBody.appendChild(tr);
-            });
+  // 先检查库存
+  for (let i = 0; i < cart.length; i++) {
+    const item = cart[i];
+    if (item.isTemp) continue;
+    const product = products.find(function (p) { return String(p.barcode) === String(item.barcode); });
+    if (!product) {
+      showCashierMsg('商品“' + item.name + '”已不在商品库中', 'error');
+      return;
+    }
+    if (Number(product.stock || 0) < item.quantity) {
+      showCashierMsg('商品“' + item.name + '”库存不足，无法结账', 'error');
+      return;
+    }
+  }
 
-            totalAmountEl.textContent = total.toFixed(2);
-        }
+  const total = cart.reduce(function (sum, item) {
+    return sum + item.price * item.quantity;
+  }, 0);
 
-        // 修改数量
-        function changeQuantity(index, delta) {
-            if (!cart[index]) return;
-            const newQty = cart[index].quantity + delta;
-            if (newQty <= 0) {
-                cart.splice(index, 1);
-            } else {
-                // 检查库存
-                const products = JSON.parse(localStorage.getItem(STORAGE_KEY_PRODUCTS)) || [];
-                const product = products.find(p => p.barcode === cart[index].barcode);
-                if (product && newQty > product.stock) {
-                    showMessage(`商品 "${product.name}" 库存不足`, 'error');
-                    return;
-                }
-                cart[index].quantity = newQty;
-            }
-            renderCart();
-        }
+  // 扣库存
+  cart.forEach(function (item) {
+    if (item.isTemp) return;
+    const product = products.find(function (p) { return String(p.barcode) === String(item.barcode); });
+    if (product) {
+      product.stock = Number(product.stock || 0) - item.quantity;
+    }
+  });
+  saveProducts(products);
 
-        // 从购物车移除
-        function removeFromCart(index) {
-            cart.splice(index, 1);
-            renderCart();
-        }
+  // 保存交易
+  const transaction = {
+    id: 'TX' + Date.now(),
+    timestamp: new Date().toISOString(),
+    items: cart.map(function (item) {
+      return {
+        barcode: item.barcode,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        isTemp: item.isTemp
+      };
+    }),
+    total: total,
+    payment: paymentMethod
+  };
+  const transactions = getTransactions();
+  transactions.push(transaction);
+  saveTransactions(transactions);
 
-        // 清空购物车
-        function clearCart() {
-            if (cart.length === 0) return;
-            if (confirm('确定要清空购物车吗？')) {
-                cart = [];
-                renderCart();
-                showMessage('购物车已清空', 'success');
-            }
-        }
+  cart = [];
+  renderCart();
+  renderCashierSummary();
+  renderDaily();
+  renderQueryTable(document.getElementById('queryFilter').value || '');
+  renderProducts();
 
-        // 结账
-        function checkout(paymentMethod) {
-            if (cart.length === 0) {
-                showMessage('购物车是空的', 'error');
-                return;
-            }
+  showCashierMsg('✅ 交易成功，' + PAYMENT_LABELS[paymentMethod] + '收款 ¥' + formatMoney(total), 'success');
+  document.getElementById('cashierInput').focus();
+}
 
-            const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+/* ==================== 今日汇总 ==================== */
+function getTodayTransactions() {
+  const key = todayKey();
+  return getTransactions().filter(function (t) { return dateKey(t.timestamp) === key; });
+}
 
-            // 1. 扣减库存
-            const products = JSON.parse(localStorage.getItem(STORAGE_KEY_PRODUCTS)) || [];
-            cart.forEach(cartItem => {
-                const product = products.find(p => p.barcode === cartItem.barcode);
-                if (product) {
-                    product.stock -= cartItem.quantity;
-                }
-            });
-            localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(products));
+function calcSummary(transactions) {
+  const summary = { count: 0, total: 0, cash: 0, wechat: 0, alipay: 0 };
+  transactions.forEach(function (t) {
+    summary.count += 1;
+    summary.total += Number(t.total || 0);
+    if (t.payment === 'cash') summary.cash += Number(t.total || 0);
+    if (t.payment === 'wechat') summary.wechat += Number(t.total || 0);
+    if (t.payment === 'alipay') summary.alipay += Number(t.total || 0);
+  });
+  return summary;
+}
 
-            // 2. 保存交易记录
-            const transaction = {
-                id: Date.now(),
-                timestamp: new Date().toISOString(),
-                items: [...cart],
-                total: total,
-                paymentMethod: paymentMethod
-            };
-            saveTransaction(transaction);
+function renderCashierSummary() {
+  const summary = calcSummary(getTodayTransactions());
+  document.getElementById('cashierTxCount').textContent = summary.count;
+  document.getElementById('cashierRevenue').textContent = formatMoney(summary.total);
+  document.getElementById('cashierCash').textContent = formatMoney(summary.cash);
+  document.getElementById('cashierWechat').textContent = formatMoney(summary.wechat);
+  document.getElementById('cashierAlipay').textContent = formatMoney(summary.alipay);
+}
 
-            // 3. 更新日结数据
-            let stats = initDailyStats();
-            stats.transactions += 1;
-            stats.totalRevenue += total;
-            if (paymentMethod === 'cash') stats.cashRevenue += total;
-            else if (paymentMethod === 'wechat') stats.wechatRevenue += total;
-            else if (paymentMethod === 'alipay') stats.alipayRevenue += total;
-            saveDailyStats(stats);
+/* ==================== 日结页面 ==================== */
+function renderDaily() {
+  const txs = getTodayTransactions();
+  const summary = calcSummary(txs);
+  const summaryEl = document.getElementById('dailySummary');
+  summaryEl.innerHTML =
+    '<div class="summary-grid">' +
+      '<div class="summary-item"><span>交易笔数</span><strong>' + summary.count + '</strong></div>' +
+      '<div class="summary-item"><span>总营业额</span><strong>¥' + formatMoney(summary.total) + '</strong></div>' +
+      '<div class="summary-item"><span>现金</span><strong>¥' + formatMoney(summary.cash) + '</strong></div>' +
+      '<div class="summary-item"><span>微信</span><strong>¥' + formatMoney(summary.wechat) + '</strong></div>' +
+      '<div class="summary-item"><span>支付宝</span><strong>¥' + formatMoney(summary.alipay) + '</strong></div>' +
+    '</div>';
 
-            // 4. 更新界面
-            updateDailyStatsUI();
+  const tbody = document.getElementById('dailyTableBody');
+  if (!txs.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty">今日暂无交易</td></tr>';
+    return;
+  }
+  tbody.innerHTML = txs.slice().reverse().map(function (t) {
+    const itemsText = (t.items || []).map(function (item) {
+      return item.name + ' ×' + item.quantity;
+    }).join('；');
+    return '<tr>' +
+      '<td>' + escapeHtml(new Date(t.timestamp).toLocaleString('zh-CN')) + '</td>' +
+      '<td>' + escapeHtml(itemsText) + '</td>' +
+      '<td>¥' + formatMoney(t.total) + '</td>' +
+      '<td>' + (PAYMENT_LABELS[t.payment] || t.payment) + '</td>' +
+    '</tr>';
+  }).join('');
+}
 
-            // 5. 清空购物车
-            cart = [];
-            renderCart();
+/* ==================== 商品管理 ==================== */
+let editingOriginalBarcode = null;
 
-            const methodName = { cash: '现金', wechat: '微信', alipay: '支付宝' }[paymentMethod];
-            showMessage(`✅ 交易成功！${methodName}收款 ¥${total.toFixed(2)}`, 'success');
-        }
+function renderProducts() {
+  const tbody = document.getElementById('productTableBody');
+  if (!tbody) return;
+  const products = getProducts();
+  if (!products.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty">暂无商品，请新增或导入 CSV</td></tr>';
+    return;
+  }
+  tbody.innerHTML = products.map(function (p, index) {
+    return '<tr>' +
+      '<td>' + escapeHtml(p.barcode) + '</td>' +
+      '<td>' + escapeHtml(p.name) + '</td>' +
+      '<td>¥' + formatMoney(p.price) + '</td>' +
+      '<td>' + (p.cost === undefined || p.cost === '' ? '-' : '¥' + formatMoney(p.cost)) + '</td>' +
+      '<td>' + (p.stock || 0) + '</td>' +
+      '<td>' +
+        '<button class="btn small" onclick="editProductByIndex(' + index + ')">编辑</button> ' +
+        '<button class="btn small danger" onclick="deleteProductByIndex(' + index + ')">删除</button>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
 
-        // 更新日结UI
-        function updateDailyStatsUI() {
-            const stats = initDailyStats();
-            document.getElementById('totalTransactions').textContent = stats.transactions;
-            document.getElementById('totalRevenue').textContent = stats.totalRevenue.toFixed(2);
-            document.getElementById('cashRevenue').textContent = stats.cashRevenue.toFixed(2);
-            document.getElementById('wechatRevenue').textContent = stats.wechatRevenue.toFixed(2);
-            document.getElementById('alipayRevenue').textContent = stats.alipayRevenue.toFixed(2);
-        }
+function showProductForm() {
+  editingOriginalBarcode = null;
+  document.getElementById('productFormTitle').textContent = '新增商品';
+  document.getElementById('pfBarcode').value = '';
+  document.getElementById('pfName').value = '';
+  document.getElementById('pfPrice').value = '';
+  document.getElementById('pfCost').value = '';
+  document.getElementById('pfStock').value = '0';
+  document.getElementById('productForm').style.display = 'block';
+  document.getElementById('pfBarcode').focus();
+}
 
-        // 导出当日数据
-        function exportData() {
-            const stats = JSON.parse(localStorage.getItem(STORAGE_KEY_DAILY_STATS));
-            const transactions = JSON.parse(localStorage.getItem(STORAGE_KEY_TRANSACTIONS)) || [];
-            const todayTransactions = transactions.filter(t => t.timestamp.slice(0, 10) === getTodayKey());
+function hideProductForm() {
+  document.getElementById('productForm').style.display = 'none';
+  editingOriginalBarcode = null;
+}
 
-            const exportData = {
-                date: stats.date,
-                summary: stats,
-                transactions: todayTransactions
-            };
+function editProductByIndex(index) {
+  const p = getProducts()[index];
+  if (!p) return;
+  editingOriginalBarcode = String(p.barcode);
+  document.getElementById('productFormTitle').textContent = '编辑商品';
+  document.getElementById('pfBarcode').value = p.barcode;
+  document.getElementById('pfName').value = p.name;
+  document.getElementById('pfPrice').value = p.price;
+  document.getElementById('pfCost').value = p.cost === undefined ? '' : p.cost;
+  document.getElementById('pfStock').value = p.stock || 0;
+  document.getElementById('productForm').style.display = 'block';
+  document.getElementById('pfName').focus();
+}
 
-            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `收银数据_${getTodayKey()}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-            showMessage('数据已导出', 'success');
-        }
+function saveProduct() {
+  const barcode = document.getElementById('pfBarcode').value.trim();
+  const name = document.getElementById('pfName').value.trim();
+  const price = Number(document.getElementById('pfPrice').value);
+  const costText = document.getElementById('pfCost').value.trim();
+  const cost = costText === '' ? '' : Number(costText);
+  const stock = Number(document.getElementById('pfStock').value || 0);
 
-        // 重置日结数据
-        function resetDailyStats() {
-            if (confirm('确定要重置今日的日结数据吗？此操作不可恢复，建议先导出备份。')) {
-                localStorage.removeItem(STORAGE_KEY_DAILY_STATS);
-                localStorage.removeItem(STORAGE_KEY_TRANSACTIONS);
-                initDailyStats();
-                updateDailyStatsUI();
-                showMessage('日结数据已重置', 'success');
-            }
-        }
+  if (!barcode) { alert('请填写条码'); return; }
+  if (!name) { alert('请填写商品名称'); return; }
+  if (!isFinite(price) || price < 0) { alert('售价无效'); return; }
+  if (cost !== '' && (!isFinite(cost) || cost < 0)) { alert('进价无效'); return; }
+  if (!isFinite(stock) || stock < 0) { alert('库存无效'); return; }
 
-        // 显示消息
-        function showMessage(msg, type) {
-            messageEl.textContent = msg;
-            messageEl.className = `message ${type}`;
-            setTimeout(() => {
-                messageEl.className = 'message';
-                messageEl.style.display = 'none';
-            }, 3000);
-        }
-    </script>
+  const products = getProducts();
+  if (editingOriginalBarcode === null) {
+    if (products.some(function (p) { return String(p.barcode) === barcode; })) {
+      alert('该条码已存在，请直接编辑原商品');
+      return;
+    }
+    products.push({ barcode: barcode, name: name, price: price, cost: cost, stock: stock });
+  } else {
+    const index = products.findIndex(function (p) { return String(p.barcode) === editingOriginalBarcode; });
+    if (index === -1) { alert('原商品不存在，请刷新'); return; }
+    const duplicate = products.some(function (p, i) {
+      return i !== index && String(p.barcode) === barcode;
+    });
+    if (duplicate) { alert('新条码与其他商品重复'); return; }
+    products[index] = { barcode: barcode, name: name, price: price, cost: cost, stock: stock };
+  }
+  saveProducts(products);
+  hideProductForm();
+  renderProducts();
+  renderQueryTable(document.getElementById('queryFilter').value || '');
+}
+
+function deleteProductByIndex(index) {
+  const products = getProducts();
+  const p = products[index];
+  if (!p) return;
+  if (!confirm('确定删除商品“' + p.name + '”吗？')) return;
+  products.splice(index, 1);
+  saveProducts(products);
+  renderProducts();
+  renderQueryTable(document.getElementById('queryFilter').value || '');
+}
+
+/* ==================== CSV / JSON 导入导出 ==================== */
+function csvEscape(value) {
+  return '"' + String(value == null ? '' : value).replace(/"/g, '""') + '"';
+}
+
+function exportProductsCSV() {
+  const products = getProducts();
+  const lines = ['条码,名称,售价,进价,库存'];
+  products.forEach(function (p) {
+    lines.push([p.barcode, p.name, p.price, p.cost === undefined ? '' : p.cost, p.stock || 0].map(csvEscape).join(','));
+  });
+  downloadFile('商品列表_' + todayKey() + '.csv', '\uFEFF' + lines.join('\r\n'), 'text/csv;charset=utf-8');
+}
+
+function exportAllJSON() {
+  const data = {
+    exportedAt: new Date().toISOString(),
+    products: getProducts(),
+    transactions: getTransactions()
+  };
+  downloadFile('便利店全部备份_' + todayKey() + '.json', JSON.stringify(data, null, 2));
+}
+
+function exportDailyJSON() {
+  const txs = getTodayTransactions();
+  const data = {
+    date: todayKey(),
+    exportedAt: new Date().toISOString(),
+    summary: calcSummary(txs),
+    transactions: txs
+  };
+  downloadFile('今日交易_' + todayKey() + '.json', JSON.stringify(data, null, 2));
+}
+
+function parseCSVLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') { current += '"'; i++; }
+        else { inQuotes = false; }
+      } else {
+        current += ch;
+      }
+    } else {
+      if (ch === '"') { inQuotes = true; }
+      else if (ch === ',') { result.push(current); current = ''; }
+      else { current += ch; }
+    }
+  }
+  result.push(current);
+  return result;
+}
+
+function parseCSV(text) {
+  const lines = text.replace(/\r/g, '').split('\n').filter(function (l) { return l.trim() !== ''; });
+  if (!lines.length) return [];
+  const first = parseCSVLine(lines[0]).map(function (h) { return h.trim(); });
+  const hasHeader = first.some(function (h) {
+    return /条码|名称|售价|价格|进价|库存|barcode|name|price|stock/i.test(h);
+  });
+  const headers = hasHeader ? first : ['条码', '名称', '售价', '进价', '库存'];
+  const start = hasHeader ? 1 : 0;
+  return lines.slice(start).map(function (line) {
+    const cols = parseCSVLine(line);
+    const obj = {};
+    headers.forEach(function (h, i) { obj[h] = cols[i] === undefined ? '' : cols[i].trim(); });
+    return obj;
+  });
+}
+
+function pickField(obj, keys) {
+  for (let i = 0; i < keys.length; i++) {
+    if (obj[keys[i]] !== undefined && obj[keys[i]] !== '') return obj[keys[i]];
+  }
+  return '';
+}
+
+function normalizeProductRow(row) {
+  const barcode = String(pickField(row, ['条码', 'barcode', 'Barcode', '条码后4位'])).trim();
+  const name = String(pickField(row, ['名称', 'name', 'Name', '商品名称'])).trim();
+  const priceRaw = String(pickField(row, ['售价', '价格', 'price', 'Price'])).replace(/[¥￥,\s]/g, '');
+  const costRaw = String(pickField(row, ['进价', 'cost', 'Cost'])).replace(/[¥￥,\s]/g, '');
+  const stockRaw = String(pickField(row, ['库存', 'stock', 'Stock'])).replace(/[,\s]/g, '');
+  const price = Number(priceRaw);
+  const cost = costRaw === '' ? '' : Number(costRaw);
+  const stock = stockRaw === '' ? 0 : Number(stockRaw);
+  if (!barcode || !name || !isFinite(price)) return null;
+  return {
+    barcode: barcode,
+    name: name,
+    price: price,
+    cost: isFinite(cost) ? cost : '',
+    stock: isFinite(stock) ? stock : 0
+  };
+}
+
+function mergeProducts(incoming) {
+  const products = getProducts();
+  let added = 0, updated = 0;
+  incoming.forEach(function (item) {
+    if (!item) return;
+    const index = products.findIndex(function (p) { return String(p.barcode) === String(item.barcode); });
+    if (index >= 0) {
+      products[index] = item;
+      updated++;
+    } else {
+      products.push(item);
+      added++;
+    }
+  });
+  saveProducts(products);
+  renderProducts();
+  renderQueryTable(document.getElementById('queryFilter').value || '');
+  return { added: added, updated: updated };
+}
+
+function importProductFileHandler(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    try {
+      const text = e.target.result;
+      let rows;
+      if (file.name.toLowerCase().endsWith('.json')) {
+        const data = JSON.parse(text);
+        rows = Array.isArray(data) ? data : (data.products || []);
+        rows = rows.map(normalizeProductRow);
+      } else {
+        rows = parseCSV(text).map(normalizeProductRow);
+      }
+      const valid = rows.filter(Boolean);
+      if (!valid.length) {
+        alert('没有读到有效商品。CSV 请确保有：条码,名称,售价,进价,库存');
+        return;
+      }
+      const result = mergeProducts(valid);
+      alert('导入完成：新增 ' + result.added + ' 条，更新 ' + result.updated + ' 条');
+    } catch (err) {
+      alert('导入失败：' + err.message);
+    } finally {
+      event.target.value = '';
+    }
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function importAllFileHandler(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.products || !Array.isArray(data.products)) {
+        alert('备份文件格式不对，缺少 products 数组');
+        return;
+      }
+      if (!confirm('确定用备份覆盖当前全部商品和交易吗？')) return;
+      saveProducts(data.products);
+      saveTransactions(Array.isArray(data.transactions) ? data.transactions : []);
+      cart = [];
+      renderProducts();
+      renderQueryTable(document.getElementById('queryFilter').value || '');
+      renderCart();
+      renderCashierSummary();
+      renderDaily();
+      alert('全部备份导入完成');
+    } catch (err) {
+      alert('导入失败：' + err.message);
+    } finally {
+      event.target.value = '';
+    }
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+/* ==================== 清空今日交易 ==================== */
+function clearTodayTransactions() {
+  const txs = getTodayTransactions();
+  if (!txs.length) {
+    alert('今日没有交易');
+    return;
+  }
+  if (!confirm('确定清空今日 ' + txs.length + ' 笔交易吗？此操作不会恢复库存，建议先导出今日交易。')) return;
+  const key = todayKey();
+  const kept = getTransactions().filter(function (t) { return dateKey(t.timestamp) !== key; });
+  saveTransactions(kept);
+  renderCashierSummary();
+  renderDaily();
+  alert('今日交易已清空');
+}
+
+/* ==================== 事件绑定与启动 ==================== */
+function init() {
+  document.querySelectorAll('nav button').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      switchTab(btn.getAttribute('data-tab'));
+    });
+  });
+
+  const queryInput = document.getElementById('queryInput');
+  queryInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      doQuery();
+    }
+  });
+
+  const queryFilter = document.getElementById('queryFilter');
+  queryFilter.addEventListener('input', function () {
+    renderQueryTable(this.value);
+  });
+
+  const cashierInput = document.getElementById('cashierInput');
+  cashierInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addToCartByInput();
+    }
+  });
+
+  // 在收银台页面点击空白处时，自动把焦点放回扫码框，方便 USB 扫码枪连续扫码
+  document.addEventListener('click', function (e) {
+    const cashierTab = document.getElementById('tab-cashier');
+    if (!cashierTab.classList.contains('active')) return;
+    if (e.target.closest('input, button, select, textarea')) return;
+    cashierInput.focus();
+  });
+
+  renderQueryTable('');
+  renderCart();
+  renderCashierSummary();
+  renderDaily();
+  renderProducts();
+
+  queryInput.focus();
+}
+
+init();
+</script>
 </body>
 </html>
